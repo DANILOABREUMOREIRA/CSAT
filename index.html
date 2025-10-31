@@ -63,6 +63,7 @@
       Frown: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
       MessageCircleQuestion: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`,
       BarChartHorizontal: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-white"><path d="M3 3v18h18"/><path d="M7 16V7"/><path d="M12 16V4"/><path d="M17 16v-9"/></svg>`,
+      PlusCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-yellow-400"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
     };
     
     // --- 2. ESTADO DA APLICAÇÃO ---
@@ -142,6 +143,23 @@
       
       const currentSatisfaction = totalResponses > 0 ? (totalSatisfied / totalResponses) * 100 : 0;
       
+      // --- NOVO CÁLCULO ---
+      const goal_decimal = satisfactionGoal / 100;
+      let neededForGoal = 0;
+      
+      if (currentSatisfaction >= satisfactionGoal) {
+        neededForGoal = 0; // Meta já atingida
+      } else if (goal_decimal >= 0.9999) { 
+        // Meta é 100%
+        neededForGoal = (totalUnsatisfied > 0) ? Infinity : 0; // Impossível se houver 1 insatisfeito
+      } else {
+        // Fórmula: x = (G * (S+U) - S) / (1 - G)
+        neededForGoal = (goal_decimal * totalResponses - totalSatisfied) / (1 - goal_decimal);
+      }
+      
+      const neededToMeetGoal = Math.max(0, Math.ceil(neededForGoal));
+      // --- FIM DO NOVO CÁLCULO ---
+
       const tableData = dailyData.map(item => {
         const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered;
         const itemResponses = item.satisfied + item.unsatisfied;
@@ -167,7 +185,7 @@
       };
 
       return {
-        satisfactionGoal, // <-- CORRIGIDO: Adicionado 'satisfactionGoal' ao objeto de retorno
+        satisfactionGoal,
         totalSatisfied,
         totalUnsatisfied,
         totalNotAnswered,
@@ -176,6 +194,7 @@
         currentSatisfaction,
         tableData,
         totalRow,
+        neededToMeetGoal, // <-- Adicionado ao retorno
       };
     };
 
@@ -460,7 +479,7 @@
 
     // Container dos Cartões de Resumo
     const renderSummaryCards = (stats) => {
-      const { satisfactionGoal, currentSatisfaction, totalInteractions } = stats;
+      const { satisfactionGoal, currentSatisfaction, totalInteractions, neededToMeetGoal } = stats;
       const isGoalMet = currentSatisfaction >= satisfactionGoal;
 
       const card1 = renderSummaryCard(
@@ -493,12 +512,26 @@
           <p class="text-sm text-gray-400">Respostas analisadas</p>
         `
       );
+      
+      // --- NOVO CARTÃO ---
+      const neededDisplay = (neededToMeetGoal === Infinity) ? "N/A" : neededToMeetGoal;
+      const colorClass = (neededToMeetGoal === Infinity) ? "text-gray-400" : "text-yellow-400";
+
+      const card4 = renderSummaryCard(
+        "Satisfeitos p/ Meta",
+        Icons.PlusCircle,
+        `
+          <span class="text-3xl font-bold ${colorClass}">${neededDisplay}</span>
+          <p class="text-sm text-gray-400">Respostas adicionais</p>
+        `
+      );
 
       return `
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           ${card1}
           ${card2}
           ${card3}
+          ${card4}
         </div>
       `;
     };
