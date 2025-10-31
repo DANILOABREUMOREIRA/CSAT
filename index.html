@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analista CSAT Dashboard</title>
+  
+  <!-- 1. Carregar o Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 2. Configurar fonte (Inter, como no original) e estilos customizados -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Aplica a fonte Inter como padrão */
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    /* Estilos para a barra de scroll (para consistência com o design) */
+    /* Firefox */
+    .overflow-y-auto {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #374151; /* gray-600 gray-700 */
+    }
+    
+    /* Chrome, Edge, e Safari */
+    .overflow-y-auto::-webkit-scrollbar {
+      width: 8px;
+    }
+    .overflow-y-auto::-webkit-scrollbar-track {
+      background: #374151; /* gray-700 */
+      border-radius: 10px;
+    }
+    .overflow-y-auto::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 10px;
+      border: 2px solid #374151; /* gray-700 */
+    }
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+  <!-- 3. O 'Root' da aplicação. O JS vai injetar o conteúdo aqui -->
+  <div id="app" class="min-h-screen p-4 sm:p-6 lg:p-8">
+    <!-- O conteúdo da aplicação será renderizado aqui pelo JavaScript -->
+  </div>
+
+  <!-- 4. JavaScript da Aplicação -->
+  <script type="module">
+    // --- 1. ÍCONES (SVGs In-line) ---
+    // Substituindo o 'lucide-react'
+    const Icons = {
+      Target: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-blue-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+      Percent: (color = "text-gray-400") => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 ${color}"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+      Hash: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-gray-400"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>`,
+      Smile: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+      Frown: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+      MessageCircleQuestion: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`,
+      BarChartHorizontal: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-white"><path d="M3 3v18h18"/><path d="M7 16V7"/><path d="M12 16V4"/><path d="M17 16v-9"/></svg>`,
+    };
+    
+    // --- 2. ESTADO DA APLICAÇÃO ---
+    // Todo o estado que era gerido pelo React 'useState'
+    let state = {
+      satisfactionGoal: 85,
+      selectedYear: 2025,
+      selectedMonth: null,
+      selectedWeek: null,
+      dailyData: [],
+    };
+    
+    // --- 3. CONSTANTES E HELPERS ---
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const yearOptions = [2023, 2024, 2025, 2026, 2027];
+
+    const getWeeksForMonth = (year, month) => {
+      const weeks = [];
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      
+      const formatDate = (d) => d.toISOString().split('T')[0];
+      const formatLabel = (d) => {
+        const day = String(d.getDate()).padStart(2, '0');
+        const monthLabel = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${monthLabel}`;
+      };
+
+      let currentDay = new Date(firstDayOfMonth);
+      currentDay.setDate(currentDay.getDate() - currentDay.getDay()); // Retrocede para o Domingo
+
+      while (currentDay <= lastDayOfMonth) {
+        const weekStart = new Date(currentDay);
+        const weekEnd = new Date(currentDay);
+        weekEnd.setDate(weekEnd.getDate() + 6); // Sábado
+
+        if (weekEnd >= firstDayOfMonth && weekStart <= lastDayOfMonth) {
+          weeks.push({
+            start: formatDate(weekStart),
+            end: formatDate(weekEnd),
+            label: `Semana: ${formatLabel(weekStart)} - ${formatLabel(weekEnd)}`
+          });
+        }
+        currentDay.setDate(currentDay.getDate() + 7);
+        if (weeks.length > 6) break;
+      }
+      return weeks;
+    };
+    
+    const generateDaysForWeek = (week) => {
+      const days = [];
+      const startDate = new Date(week.start + 'T00:00:00'); // Garante o fuso horário local
+
+      for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + i);
+        const dateString = currentDate.toISOString().split('T')[0];
+        
+        days.push({
+          id: dateString,
+          date: dateString,
+          satisfied: 0,
+          unsatisfied: 0,
+          notAnswered: 0
+        });
+      }
+      return days;
+    };
+
+    // 'useMemo' da estatística, agora como uma função normal
+    const calculateStats = (dailyData, satisfactionGoal) => {
+      const totalSatisfied = dailyData.reduce((acc, item) => acc + item.satisfied, 0);
+      const totalUnsatisfied = dailyData.reduce((acc, item) => acc + item.unsatisfied, 0);
+      const totalNotAnswered = dailyData.reduce((acc, item) => acc + item.notAnswered, 0);
+      const totalInteractions = totalSatisfied + totalUnsatisfied + totalNotAnswered;
+      const totalResponses = totalSatisfied + totalUnsatisfied;
+      
+      const currentSatisfaction = totalResponses > 0 ? (totalSatisfied / totalResponses) * 100 : 0;
+      
+      const tableData = dailyData.map(item => {
+        const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered;
+        const itemResponses = item.satisfied + item.unsatisfied;
+        const itemSatPercent = itemResponses > 0 ? (item.satisfied / itemResponses) * 100 : 0;
+        const gap = itemSatPercent - satisfactionGoal;
+        return {
+          ...item,
+          date: item.date.split('-').reverse().join('/'),
+          total: itemTotal,
+          satPercent: itemSatPercent,
+          gap: gap
+        };
+      });
+      
+      const totalRow = {
+        date: 'Total do Período',
+        satisfied: totalSatisfied,
+        unsatisfied: totalUnsatisfied,
+        notAnswered: totalNotAnswered,
+        total: totalInteractions,
+        satPercent: currentSatisfaction,
+        gap: currentSatisfaction - satisfactionGoal
+      };
+
+      return {
+        satisfactionGoal, // <-- CORRIGIDO: Adicionado 'satisfactionGoal' ao objeto de retorno
+        totalSatisfied,
+        totalUnsatisfied,
+        totalNotAnswered,
+        totalInteractions,
+        totalResponses,
+        currentSatisfaction,
+        tableData,
+        totalRow,
+      };
+    };
+
+    // --- 4. MANIPULADORES DE EVENTOS (HANDLERS) ---
+    // Estas funções são anexadas ao 'window' para serem chamadas pelo 'onclick'
+    
+    window.handleGoalChange = (value) => {
+      state.satisfactionGoal = Number(value);
+      renderApp(); // Re-renderiza a aplicação
+    };
+    
+    window.handleYearSelect = (year) => {
+      state.selectedYear = year;
+      state.selectedMonth = null;
+      state.selectedWeek = null;
+      state.dailyData = []; // Limpa os dados ao mudar o ano
+      renderApp();
+    };
+    
+    window.handleMonthSelect = (month) => {
+      state.selectedMonth = Number(month);
+      state.selectedWeek = null;
+      state.dailyData = []; // Limpa os dados ao mudar o mês
+      renderApp();
+    };
+    
+    window.handleWeekSelect = (weekStart) => {
+      // O 'onclick' só pode passar strings, então encontramos o objeto 'week'
+      const weeksInMonth = getWeeksForMonth(state.selectedYear, state.selectedMonth);
+      const week = weeksInMonth.find(w => w.start === weekStart);
+      
+      if (week) {
+        state.selectedWeek = week;
+        state.dailyData = generateDaysForWeek(week); // Gera os 7 dias
+        renderApp();
+      }
+    };
+    
+    window.handleUpdateData = (id) => {
+      // Pega os valores diretamente dos inputs
+      const satisfied = Number(document.getElementById(`satisfied-${id}`).value);
+      const unsatisfied = Number(document.getElementById(`unsatisfied-${id}`).value);
+      const notAnswered = Number(document.getElementById(`notAnswered-${id}`).value);
+      
+      state.dailyData = state.dailyData
+        .map(item =>
+          item.id === id ? { ...item, satisfied, unsatisfied, notAnswered } : item
+        )
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+      renderApp(); // Re-renderiza
+      
+      // Reabre o <details> que foi fechado pelo re-render
+      const detailsElement = document.getElementById(`details-${id}`);
+      if (detailsElement) {
+        detailsElement.open = true;
+      }
+    };
+
+    // --- 5. FUNÇÕES DE RENDERIZAÇÃO (JSX -> HTML String) ---
+    
+    // Wrapper genérico
+    const renderDashboardCard = (title, children) => {
+      return `
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-4 sm:p-6 shadow-lg">
+          ${title ? `<h2 class="text-lg font-semibold text-white mb-4">${title}</h2>` : ''}
+          ${children}
+        </div>
+      `;
+    };
+
+    // Cabeçalho
+    const renderHeader = () => {
+      return `
+        <header class="flex items-center gap-3 mb-6">
+          <div class="bg-blue-600 p-2 rounded-lg">
+            ${Icons.BarChartHorizontal}
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-white">Analista de Métricas CSAT</h1>
+            <p class="text-sm text-gray-400">Sistema completo de análise de satisfação do cliente</p>
+          </div>
+        </header>
+      `;
+    };
+
+    // Botão de Filtro
+    const renderFilterButton = (text, onClick, isSelected, fullWidth = false) => {
+      const selectedClass = 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400';
+      const defaultClass = 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:border-gray-500';
+      return `
+        <button
+          onclick="${onClick}"
+          class="
+            px-4 py-2 rounded-lg text-sm font-medium transition-all
+            border border-transparent
+            ${fullWidth ? 'w-full text-left' : 'flex-grow-0'}
+            ${isSelected ? selectedClass : defaultClass}
+          "
+        >
+          ${text}
+        </button>
+      `;
+    };
+    
+    // Painel de Configurações
+    const renderSettingsPanel = (state) => {
+      const { satisfactionGoal, selectedYear, selectedMonth, selectedWeek } = state;
+      
+      let yearButtons = yearOptions.map(year => 
+        renderFilterButton(year, `handleYearSelect(${year})`, selectedYear === year)
+      ).join('');
+      
+      let monthButtons = '';
+      if (selectedYear) {
+        monthButtons = monthNames.map((name, index) => 
+          renderFilterButton(name, `handleMonthSelect(${index})`, selectedMonth === index)
+        ).join('');
+      }
+      
+      let weekButtons = '';
+      if (selectedYear && selectedMonth !== null) {
+        const weeksInMonth = getWeeksForMonth(selectedYear, selectedMonth);
+        if (weeksInMonth.length > 0) {
+          weekButtons = weeksInMonth.map(week =>
+            renderFilterButton(week.label, `handleWeekSelect('${week.start}')`, selectedWeek?.start === week.start, true)
+          ).join('');
+        } else {
+          weekButtons = `<p class="text-sm text-gray-500">Nenhuma semana encontrada para este mês.</p>`;
+        }
+      }
+
+      const goalInput = `
+        <div class="mb-6">
+          <label for="goal" class="block text-sm font-medium text-gray-300 mb-2">
+            Meta de Satisfação (%)
+          </label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2">${Icons.Percent()}</span>
+            <input
+              type="number"
+              id="goal"
+              class="w-full bg-gray-700 border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              value="${satisfactionGoal}"
+              oninput="handleGoalChange(this.value)"
+              min="0"
+              max="100"
+            />
+          </div>
+        </div>
+      `;
+      
+      const periodSelector = `
+        <div>
+          <h3 class="block text-lg font-medium text-gray-300 mb-3">
+            Gerar Período Automático
+          </h3>
+          <p class="text-sm text-gray-400 mb-4">Selecione o ano, mês e a semana (Dom-Sáb) para filtrar a entrada de dados.</p>
+          
+          <div class="flex flex-col gap-4">
+            <!-- Linha 1: Anos -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-400 mb-2">1. Ano</label>
+              <div class="flex flex-wrap gap-2">
+                ${yearButtons}
+              </div>
+            </div>
+            <!-- Linha 2: Meses -->
+            ${selectedYear ? `
+            <div>
+              <label class="block text-sm font-semibold text-gray-400 mb-2">2. Mês</label>
+              <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                ${monthButtons}
+              </div>
+            </div>` : ''}
+            <!-- Linha 3: Semanas -->
+            ${selectedYear && selectedMonth !== null ? `
+            <div>
+              <label class="block text-sm font-semibold text-gray-400 mb-2">3. Semana</label>
+              <div class="flex flex-col gap-2">
+                ${weekButtons}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+      `;
+      
+      return renderDashboardCard('Configuração', goalInput + periodSelector);
+    };
+
+    // Input reutilizável
+    const renderInput = (id, type, value, IconSvg, placeholder) => `
+      <div class="relative">
+        ${IconSvg}
+        <input
+          id="${id}"
+          type="${type}"
+          placeholder="${placeholder}"
+          value="${value}"
+          class="w-full bg-gray-700 border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+          min="0"
+          required
+        />
+      </div>
+    `;
+
+    // Item da lista de dados
+    const renderDailyDataItem = (item) => {
+      const { id, date, satisfied, unsatisfied, notAnswered } = item;
+      const total = satisfied + unsatisfied + notAnswered;
+      const responses = satisfied + unsatisfied;
+      const satPercent = responses > 0 ? (satisfied / responses) * 100 : 0;
+      const displayDate = date.split('-').reverse().join('/');
+      const satColorClass = satPercent >= 80 ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100';
+
+      return `
+        <details class="bg-gray-800 rounded-lg border border-gray-700 group" id="details-${id}">
+          <summary class="flex justify-between items-center p-3 cursor-pointer list-none group-open:border-b group-open:border-gray-700">
+            <div class="flex items-center">
+              <span class="font-medium text-white">${displayDate}</span>
+              <span class="ml-2 text-xs text-gray-400">(Total: ${total})</span>
+              <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${satColorClass}">
+                ${satPercent.toFixed(1)}%
+              </span>
+            </div>
+          </summary>
+          <div class="p-4 flex flex-col gap-4 border-t border-gray-700">
+            ${renderInput(`satisfied-${id}`, 'number', satisfied, Icons.Smile, 'Satisfeitos')}
+            ${renderInput(`unsatisfied-${id}`, 'number', unsatisfied, Icons.Frown, 'Insatisfeitos')}
+            ${renderInput(`notAnswered-${id}`, 'number', notAnswered, Icons.MessageCircleQuestion, 'Não Resp.')}
+            <button
+              onclick="handleUpdateData('${id}')"
+              class="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              Salvar Alterações
+            </button>
+          </div>
+        </details>
+      `;
+    };
+
+    // Painel de Dados Diários
+    const renderDailyDataInput = (state) => {
+      const { dailyData } = state;
+      
+      let itemsList;
+      if (dailyData.length === 0) {
+        itemsList = `<p class="text-center text-gray-500 py-4">Nenhum dado cadastrado.</p>`;
+      } else {
+        itemsList = dailyData.map(renderDailyDataItem).join('');
+      }
+
+      const header = `
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="text-lg font-semibold text-white">Dados Diários</h2>
+        </div>
+        <p class="text-sm text-gray-400 mb-4">${dailyData.length} dia(s) cadastrado(s)</p>
+      `;
+      
+      const listContainer = `
+        <div class="max-h-96 overflow-y-auto space-y-3 pr-2">
+          ${itemsList}
+        </div>
+      `;
+      
+      return renderDashboardCard('', header + listContainer); // Sem título no card
+    };
+
+    // Cartão de Resumo
+    const renderSummaryCard = (title, IconSvg, children) => {
+      const cardContent = `
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm font-medium text-gray-400">${title}</h3>
+          ${IconSvg}
+        </div>
+        <div>
+          ${children}
+        </div>
+      `;
+      return renderDashboardCard('', cardContent);
+    };
+
+    // Container dos Cartões de Resumo
+    const renderSummaryCards = (stats) => {
+      const { satisfactionGoal, currentSatisfaction, totalInteractions } = stats;
+      const isGoalMet = currentSatisfaction >= satisfactionGoal;
+
+      const card1 = renderSummaryCard(
+        "Meta da Satisfação",
+        Icons.Target,
+        `
+          <span class="text-3xl font-bold text-white">${satisfactionGoal.toFixed(1)}%</span>
+          <p class="text-sm font-medium ${isGoalMet ? 'text-green-400' : 'text-gray-400'}">
+            ${isGoalMet ? 'Meta alcançada' : 'A ser alcançado'}
+          </p>
+        `
+      );
+      
+      const card2 = renderSummaryCard(
+        "Satisfação Atual",
+        Icons.Percent(isGoalMet ? 'text-green-400' : 'text-red-400'),
+        `
+          <span class="text-3xl font-bold ${isGoalMet ? 'text-green-400' : 'text-red-400'}">
+            ${currentSatisfaction.toFixed(1)}%
+          </span>
+          <p class="text-sm text-gray-400">Total do período</p>
+        `
+      );
+      
+      const card3 = renderSummaryCard(
+        "Total de Interações",
+        Icons.Hash,
+        `
+          <span class="text-3xl font-bold text-white">${totalInteractions}</span>
+          <p class="text-sm text-gray-400">Respostas analisadas</p>
+        `
+      );
+
+      return `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          ${card1}
+          ${card2}
+          ${card3}
+        </div>
+      `;
+    };
+
+    // Tabela de Resultados
+    const renderDailyResultsTable = (stats) => {
+      const { tableData, totalRow } = stats;
+      
+      const tableHeader = `
+        <thead>
+          <tr class="border-b border-gray-700 text-gray-400">
+            <th class="py-2 px-3">Data</th>
+            <th class="py-2 px-3 text-center">Sat.</th>
+            <th class="py-2 px-3 text-center">Ins.</th>
+            <th class="py-2 px-3 text-center">N.R.</th>
+            <th class="py-2 px-3 text-center">Total</th>
+            <th class="py-2 px-3 text-center">% Sat.</th>
+            <th class="py-2 px-3 text-center">Lacuna</th>
+          </tr>
+        </thead>
+      `;
+      
+      const renderRow = (row, isFooter = false) => {
+        const gapColor = row.gap >= 0 ? 'text-green-400' : 'text-red-400';
+        const fontWeight = isFooter ? 'font-bold' : 'font-medium';
+        const tag = isFooter ? 'td' : 'td'; // Em HTML, <tfoot> usa <td>
+        
+        return `
+          <tr class="${isFooter ? 'bg-gray-900 border-t-2 border-gray-600' : 'border-b border-gray-700 hover:bg-gray-800'}">
+            <${tag} class="py-3 px-3 ${fontWeight} text-white">${row.date}</${tag}>
+            <${tag} class="py-3 px-3 text-center ${fontWeight} text-green-400">${row.satisfied}</${tag}>
+      
+            <${tag} class="py-3 px-3 text-center ${fontWeight} text-red-400">${row.unsatisfied}</${tag}>
+            <${tag} class="py-3 px-3 text-center ${fontWeight} text-gray-400">${row.notAnswered}</${tag}>
+            <${tag} class="py-3 px-3 text-center ${fontWeight} text-white">${row.total}</${tag}>
+            <${tag} class="py-3 px-3 text-center font-bold text-white">${row.satPercent.toFixed(1)}%</${tag}>
+            <${tag} class="py-3 px-3 text-center ${fontWeight} ${gapColor}">
+              ${row.gap >= 0 ? '+' : ''}${row.gap.toFixed(1)}%
+            </${tag}>
+          </tr>
+        `;
+      };
+      
+      const tableBody = `<tbody>${tableData.map(row => renderRow(row, false)).join('')}</tbody>`;
+      const tableFooter = `<tfoot>${renderRow(totalRow, true)}</tfoot>`;
+      
+      const tableContent = `
+        <p class="text-sm text-gray-400 mb-4">Análise detalhada das métricas por dia</p>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[600px] text-left text-sm">
+            ${tableHeader}
+            ${tableBody}
+            ${tableFooter}
+          </table>
+        </div>
+      `;
+      
+      return renderDashboardCard('Resultados Diários', tableContent);
+    };
+    
+    // --- 6. RENDERIZAÇÃO PRINCIPAL ---
+    // Esta função é chamada para desenhar e redesenhar a UI
+    
+    function renderApp() {
+      // 1. Obter o elemento root
+      const appEl = document.getElementById('app');
+      
+      // 2. Calcular o estado derivado (antigo useMemo)
+      const stats = calculateStats(state.dailyData, state.satisfactionGoal);
+      
+      // 3. Gerar todo o HTML
+      const appHTML = `
+        ${renderHeader()}
+        <main class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Coluna da Esquerda: Configurações e Entradas -->
+          <aside class="lg:col-span-1 flex flex-col gap-6">
+            ${renderSettingsPanel(state)}
+            ${renderDailyDataInput(state)}
+          </aside>
+
+          <!-- Coluna da Direita: Resultados e Gráficos -->
+          <section class="lg:col-span-2 flex flex-col gap-6">
+            ${renderSummaryCards(stats)}
+            ${renderDailyResultsTable(stats)}
+          </section>
+          
+        </main>
+      `;
+      
+      // 4. Injetar o HTML no DOM
+      appEl.innerHTML = appHTML;
+    }
+
+    // --- 7. INICIALIZAÇÃO ---
+    // Renderiza a aplicação pela primeira vez quando a página carrega
+    document.addEventListener('DOMContentLoaded', renderApp);
+
+  </script>
+</body>
+</html>
+
