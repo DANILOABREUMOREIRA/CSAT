@@ -138,12 +138,12 @@
       const totalSatisfied = dailyData.reduce((acc, item) => acc + item.satisfied, 0);
       const totalUnsatisfied = dailyData.reduce((acc, item) => acc + item.unsatisfied, 0);
       const totalNotAnswered = dailyData.reduce((acc, item) => acc + item.notAnswered, 0);
-      const totalInteractions = totalSatisfied + totalUnsatisfied + totalNotAnswered;
-      const totalResponses = totalSatisfied + totalUnsatisfied;
+      const totalInteractions = totalSatisfied + totalUnsatisfied + totalNotAnswered; // <-- Base de cálculo
       
-      const currentSatisfaction = totalResponses > 0 ? (totalSatisfied / totalResponses) * 100 : 0;
+      // ATUALIZADO: A base agora é 'totalInteractions'
+      const currentSatisfaction = totalInteractions > 0 ? (totalSatisfied / totalInteractions) * 100 : 0;
       
-      // --- NOVO CÁLCULO ---
+      // --- CÁLCULO ATUALIZADO PARA A META ---
       const goal_decimal = satisfactionGoal / 100;
       let neededForGoal = 0;
       
@@ -151,19 +151,22 @@
         neededForGoal = 0; // Meta já atingida
       } else if (goal_decimal >= 0.9999) { 
         // Meta é 100%
-        neededForGoal = (totalUnsatisfied > 0) ? Infinity : 0; // Impossível se houver 1 insatisfeito
+        // ATUALIZADO: Se houver 1 insatisfeito OU 1 não respondido, é impossível
+        neededForGoal = (totalUnsatisfied > 0 || totalNotAnswered > 0) ? Infinity : 0; 
       } else {
-        // Fórmula: x = (G * (S+U) - S) / (1 - G)
-        neededForGoal = (goal_decimal * totalResponses - totalSatisfied) / (1 - goal_decimal);
+        // Fórmula: x = (G * (S+U+NR) - S) / (1 - G)
+        // ATUALIZADO: usa 'totalInteractions' como base
+        neededForGoal = (goal_decimal * totalInteractions - totalSatisfied) / (1 - goal_decimal);
       }
       
       const neededToMeetGoal = Math.max(0, Math.ceil(neededForGoal));
-      // --- FIM DO NOVO CÁLCULO ---
+      // --- FIM DO CÁLCULO ATUALIZADO ---
 
       const tableData = dailyData.map(item => {
-        const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered;
-        const itemResponses = item.satisfied + item.unsatisfied;
-        const itemSatPercent = itemResponses > 0 ? (item.satisfied / itemResponses) * 100 : 0;
+        const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered; // <-- Base de cálculo por item
+        
+        // ATUALIZADO: A base agora é 'itemTotal'
+        const itemSatPercent = itemTotal > 0 ? (item.satisfied / itemTotal) * 100 : 0;
         const gap = itemSatPercent - satisfactionGoal;
         return {
           ...item,
@@ -180,7 +183,7 @@
         unsatisfied: totalUnsatisfied,
         notAnswered: totalNotAnswered,
         total: totalInteractions,
-        satPercent: currentSatisfaction,
+        satPercent: currentSatisfaction, // Já usa o cálculo atualizado
         gap: currentSatisfaction - satisfactionGoal
       };
 
@@ -190,11 +193,10 @@
         totalUnsatisfied,
         totalNotAnswered,
         totalInteractions,
-        totalResponses,
         currentSatisfaction,
         tableData,
         totalRow,
-        neededToMeetGoal, // <-- Adicionado ao retorno
+        neededToMeetGoal,
       };
     };
 
@@ -319,6 +321,7 @@
       if (selectedYear && selectedMonth !== null) {
         const weeksInMonth = getWeeksForMonth(selectedYear, selectedMonth);
         if (weeksInMonth.length > 0) {
+          // Layout de 2 colunas para as semanas
           weekButtons = weeksInMonth.map(week =>
             renderFilterButton(week.label, `handleWeekSelect('${week.start}')`, selectedWeek?.start === week.start, true)
           ).join('');
@@ -374,7 +377,7 @@
             ${selectedYear && selectedMonth !== null ? `
             <div>
               <label class="block text-sm font-semibold text-gray-400 mb-2">3. Semana</label>
-              <div class="flex flex-col gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 ${weekButtons}
               </div>
             </div>` : ''}
@@ -404,9 +407,10 @@
     // Item da lista de dados
     const renderDailyDataItem = (item) => {
       const { id, date, satisfied, unsatisfied, notAnswered } = item;
-      const total = satisfied + unsatisfied + notAnswered;
-      const responses = satisfied + unsatisfied;
-      const satPercent = responses > 0 ? (satisfied / responses) * 100 : 0;
+      const total = satisfied + unsatisfied + notAnswered; // <-- Base de cálculo
+      
+      // ATUALIZADO: A base agora é 'total'
+      const satPercent = total > 0 ? (satisfied / total) * 100 : 0;
       const displayDate = date.split('-').reverse().join('/');
       const satColorClass = satPercent >= 80 ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100';
 
@@ -454,8 +458,9 @@
         <p class="text-sm text-gray-400 mb-4">${dailyData.length} dia(s) cadastrado(s)</p>
       `;
       
+      // REMOVIDO: max-h-96 e overflow-y-auto
       const listContainer = `
-        <div class="max-h-96 overflow-y-auto space-y-3 pr-2">
+        <div class="space-y-3 pr-2">
           ${itemsList}
         </div>
       `;
@@ -543,7 +548,7 @@
       const tableHeader = `
         <thead>
           <tr class="border-b border-gray-700 text-gray-400">
-            <th class="py-2 px-3">Data</th>
+            <th class="py-2 px-3 text-left">Data</th>
             <th class="py-2 px-3 text-center">Sat.</th>
             <th class="py-2 px-3 text-center">Ins.</th>
             <th class="py-2 px-3 text-center">N.R.</th>
@@ -561,7 +566,7 @@
         
         return `
           <tr class="${isFooter ? 'bg-gray-900 border-t-2 border-gray-600' : 'border-b border-gray-700 hover:bg-gray-800'}">
-            <${tag} class="py-3 px-3 ${fontWeight} text-white">${row.date}</${tag}>
+            <${tag} class="py-3 px-3 text-left ${fontWeight} text-white">${row.date}</${tag}>
             <${tag} class="py-3 px-3 text-center ${fontWeight} text-green-400">${row.satisfied}</${tag}>
       
             <${tag} class="py-3 px-3 text-center ${fontWeight} text-red-400">${row.unsatisfied}</${tag}>
@@ -578,10 +583,11 @@
       const tableBody = `<tbody>${tableData.map(row => renderRow(row, false)).join('')}</tbody>`;
       const tableFooter = `<tfoot>${renderRow(totalRow, true)}</tfoot>`;
       
+      // REMOVIDO: overflow-x-auto e min-w-[600px]
       const tableContent = `
         <p class="text-sm text-gray-400 mb-4">Análise detalhada das métricas por dia</p>
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-[600px] text-left text-sm">
+        <div>
+          <table class="w-full text-left text-sm">
             ${tableHeader}
             ${tableBody}
             ${tableFooter}
