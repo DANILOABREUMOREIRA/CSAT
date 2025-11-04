@@ -76,7 +76,7 @@
       selectedYear: 2025,
       selectedMonth: null,
       selectedWeek: null,
-      dailyData: [],
+      dailyData: [], // <-- AGORA É O ARMAZENAMENTO MESTRE DE *TODOS* OS DADOS
     };
     
     // Tenta carregar do localStorage, senão usa o padrão
@@ -163,39 +163,49 @@
       return days;
     };
 
-    // 'useMemo' da estatística, agora como uma função normal
+    /**
+     * Calcula as estatísticas APENAS para os dados fornecidos (filtrados).
+     * @param {Array} dailyData - O array de dados JÁ FILTRADO para a semana.
+     * @param {number} satisfactionGoal - A meta.
+     */
     const calculateStats = (dailyData, satisfactionGoal) => {
+      // Se dailyData for nulo ou vazio (nenhuma semana selecionada), retorna zeros.
+      if (!dailyData || dailyData.length === 0) {
+        return {
+          satisfactionGoal,
+          totalSatisfied: 0,
+          totalUnsatisfied: 0,
+          totalNotAnswered: 0,
+          totalInteractions: 0,
+          currentSatisfaction: 0,
+          tableData: [],
+          totalRow: { date: 'Total do Período', satisfied: 0, unsatisfied: 0, notAnswered: 0, total: 0, satPercent: 0, gap: -satisfactionGoal },
+          neededToMeetGoal: 0,
+        };
+      }
+      
       const totalSatisfied = dailyData.reduce((acc, item) => acc + item.satisfied, 0);
       const totalUnsatisfied = dailyData.reduce((acc, item) => acc + item.unsatisfied, 0);
       const totalNotAnswered = dailyData.reduce((acc, item) => acc + item.notAnswered, 0);
       const totalInteractions = totalSatisfied + totalUnsatisfied + totalNotAnswered; // <-- Base de cálculo
       
-      // ATUALIZADO: A base agora é 'totalInteractions'
       const currentSatisfaction = totalInteractions > 0 ? (totalSatisfied / totalInteractions) * 100 : 0;
       
-      // --- CÁLCULO ATUALIZADO PARA A META ---
       const goal_decimal = satisfactionGoal / 100;
       let neededForGoal = 0;
       
       if (currentSatisfaction >= satisfactionGoal) {
-        neededForGoal = 0; // Meta já atingida
+        neededForGoal = 0;
       } else if (goal_decimal >= 0.9999) { 
-        // Meta é 100%
-        // ATUALIZADO: Se houver 1 insatisfeito OU 1 não respondido, é impossível
         neededForGoal = (totalUnsatisfied > 0 || totalNotAnswered > 0) ? Infinity : 0; 
       } else {
-        // Fórmula: x = (G * (S+U+NR) - S) / (1 - G)
-        // ATUALIZADO: usa 'totalInteractions' como base
         neededForGoal = (goal_decimal * totalInteractions - totalSatisfied) / (1 - goal_decimal);
       }
       
       const neededToMeetGoal = Math.max(0, Math.ceil(neededForGoal));
-      // --- FIM DO CÁLCULO ATUALIZADO ---
 
       const tableData = dailyData.map(item => {
-        const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered; // <-- Base de cálculo por item
-        
-        // ATUALIZADO: A base agora é 'itemTotal'
+        const itemTotal = item.satisfied + item.unsatisfied + item.notAnswered;
         const itemSatPercent = itemTotal > 0 ? (item.satisfied / itemTotal) * 100 : 0;
         const gap = itemSatPercent - satisfactionGoal;
         return {
@@ -213,7 +223,7 @@
         unsatisfied: totalUnsatisfied,
         notAnswered: totalNotAnswered,
         total: totalInteractions,
-        satPercent: currentSatisfaction, // Já usa o cálculo atualizado
+        satPercent: currentSatisfaction,
         gap: currentSatisfaction - satisfactionGoal
       };
 
@@ -231,51 +241,73 @@
     };
 
     // --- 4. MANIPULADORES DE EVENTOS (HANDLERS) ---
-    // Estas funções são anexadas ao 'window' para serem chamadas pelo 'onclick'
     
     window.handleGoalChange = (value) => {
       state.satisfactionGoal = Number(value);
       renderApp(); // Re-renderiza a aplicação
     };
     
+    // ATUALIZADO: Não limpa mais os dados, apenas o filtro
     window.handleYearSelect = (year) => {
       state.selectedYear = year;
       state.selectedMonth = null;
       state.selectedWeek = null;
-      state.dailyData = []; // Limpa os dados ao mudar o ano
+      // state.dailyData = []; // <-- REMOVIDO: Não apaga mais os dados
       renderApp();
     };
     
+    // ATUALIZADO: Não limpa mais os dados, apenas o filtro
     window.handleMonthSelect = (month) => {
       state.selectedMonth = Number(month);
       state.selectedWeek = null;
-      state.dailyData = []; // Limpa os dados ao mudar o mês
+      // state.dailyData = []; // <-- REMOVIDO: Não apaga mais os dados
       renderApp();
     };
     
+    // ATUALIZADO: Adiciona os dias da semana ao armazém mestre se não existirem
     window.handleWeekSelect = (weekStart) => {
-      // O 'onclick' só pode passar strings, então encontramos o objeto 'week'
       const weeksInMonth = getWeeksForMonth(state.selectedYear, state.selectedMonth);
       const week = weeksInMonth.find(w => w.start === weekStart);
       
       if (week) {
         state.selectedWeek = week;
-        state.dailyData = generateDaysForWeek(week); // Gera os 7 dias
+        
+        // --- LÓGICA DE ADIÇÃO INTELIGENTE ---
+        // 1. Gera os 7 dias que *deveriam* existir para esta semana
+        const daysForThisWeek = generateDaysForWeek(week);
+        
+        // 2. Verifica quais (se algum) desses dias *não* estão no armazém mestre
+        const newDaysToAdd = daysForThisWeek.filter(weekDay => {
+          // .some() é mais rápido que .find() para apenas verificar existência
+          return !state.dailyData.some(dataDay => dataDay.id === weekDay.id);
+        });
+        
+        // 3. Se houver dias novos, adiciona-os ao armazém mestre
+        if (newDaysToAdd.length > 0) {
+          state.dailyData = [...state.dailyData, ...newDaysToAdd];
+          // Re-ordenar (opcional, mas bom para consistência se exportar)
+          state.dailyData.sort((a, b) => new Date(a.date) - new Date(b.date));
+        }
+        // --- FIM DA LÓGICA ---
+        
+        // state.dailyData = generateDaysForWeek(week); // <-- Linha antiga substituída
+        
         renderApp();
       }
     };
     
+    // ATUALIZADO: Esta função agora altera o armazém mestre 'state.dailyData'
     window.handleUpdateData = (id) => {
-      // Pega os valores diretamente dos inputs
       const satisfied = Number(document.getElementById(`satisfied-${id}`).value);
       const unsatisfied = Number(document.getElementById(`unsatisfied-${id}`).value);
       const notAnswered = Number(document.getElementById(`notAnswered-${id}`).value);
       
+      // Mapeia e atualiza o armazém mestre
       state.dailyData = state.dailyData
         .map(item =>
           item.id === id ? { ...item, satisfied, unsatisfied, notAnswered } : item
         )
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+        .sort((a, b) => new Date(a.date) - new Date(b.date)); // Ordena o mestre
         
       renderApp(); // Re-renderiza
       
@@ -288,7 +320,6 @@
 
     // --- 5. FUNÇÕES DE RENDERIZAÇÃO (JSX -> HTML String) ---
     
-    // Wrapper genérico
     const renderDashboardCard = (title, children) => {
       return `
         <div class="bg-gray-800 rounded-lg border border-gray-700 p-4 sm:p-6 shadow-lg">
@@ -298,7 +329,6 @@
       `;
     };
 
-    // Cabeçalho
     const renderHeader = () => {
       return `
         <header class="flex items-center gap-3 mb-6">
@@ -313,7 +343,6 @@
       `;
     };
 
-    // Botão de Filtro
     const renderFilterButton = (text, onClick, isSelected, fullWidth = false) => {
       const selectedClass = 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400';
       const defaultClass = 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:border-gray-500';
@@ -332,7 +361,7 @@
       `;
     };
     
-    // Painel de Configurações
+    // Renderiza com base no 'state' (para botões selecionados)
     const renderSettingsPanel = (state) => {
       const { satisfactionGoal, selectedYear, selectedMonth, selectedWeek } = state;
       
@@ -351,7 +380,6 @@
       if (selectedYear && selectedMonth !== null) {
         const weeksInMonth = getWeeksForMonth(selectedYear, selectedMonth);
         if (weeksInMonth.length > 0) {
-          // Layout de 2 colunas para as semanas
           weekButtons = weeksInMonth.map(week =>
             renderFilterButton(week.label, `handleWeekSelect('${week.start}')`, selectedWeek?.start === week.start, true)
           ).join('');
@@ -418,7 +446,6 @@
       return renderDashboardCard('Configuração', goalInput + periodSelector);
     };
 
-    // Input reutilizável
     const renderInput = (id, type, value, IconSvg, placeholder) => `
       <div class="relative">
         ${IconSvg}
@@ -437,9 +464,7 @@
     // Item da lista de dados
     const renderDailyDataItem = (item) => {
       const { id, date, satisfied, unsatisfied, notAnswered } = item;
-      const total = satisfied + unsatisfied + notAnswered; // <-- Base de cálculo
-      
-      // ATUALIZADO: A base agora é 'total'
+      const total = satisfied + unsatisfied + notAnswered;
       const satPercent = total > 0 ? (satisfied / total) * 100 : 0;
       const displayDate = date.split('-').reverse().join('/');
       const satColorClass = satPercent >= 80 ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100';
@@ -470,12 +495,15 @@
       `;
     };
 
-    // Painel de Dados Diários
-    const renderDailyDataInput = (state) => {
-      const { dailyData } = state;
+    // ATUALIZADO: Recebe 'filteredData' e 'selectedWeek'
+    const renderDailyDataInput = (filteredData, selectedWeek) => {
+      const dailyData = filteredData; // Renomeia para manter o resto do código
       
       let itemsList;
-      if (dailyData.length === 0) {
+      if (!selectedWeek) {
+        itemsList = `<p class="text-center text-gray-500 py-4">Selecione uma semana para ver os dados.</p>`;
+      } else if (dailyData.length === 0) {
+        // Isto não deve acontecer com a nova lógica (pois os dias são auto-criados), mas é uma boa salvaguarda.
         itemsList = `<p class="text-center text-gray-500 py-4">Nenhum dado cadastrado.</p>`;
       } else {
         itemsList = dailyData.map(renderDailyDataItem).join('');
@@ -488,14 +516,13 @@
         <p class="text-sm text-gray-400 mb-4">${dailyData.length} dia(s) cadastrado(s)</p>
       `;
       
-      // REMOVIDO: max-h-96 e overflow-y-auto
       const listContainer = `
         <div class="space-y-3 pr-2">
           ${itemsList}
         </div>
       `;
       
-      return renderDashboardCard('', header + listContainer); // Sem título no card
+      return renderDashboardCard('', header + listContainer);
     };
 
     // Cartão de Resumo
@@ -512,7 +539,7 @@
       return renderDashboardCard('', cardContent);
     };
 
-    // Container dos Cartões de Resumo
+    // Container dos Cartões de Resumo (renderiza com base nas 'stats' filtradas)
     const renderSummaryCards = (stats) => {
       const { satisfactionGoal, currentSatisfaction, totalInteractions, neededToMeetGoal } = stats;
       const isGoalMet = currentSatisfaction >= satisfactionGoal;
@@ -548,7 +575,6 @@
         `
       );
       
-      // --- NOVO CARTÃO ---
       const neededDisplay = (neededToMeetGoal === Infinity) ? "N/A" : neededToMeetGoal;
       const colorClass = (neededToMeetGoal === Infinity) ? "text-gray-400" : "text-yellow-400";
 
@@ -571,7 +597,7 @@
       `;
     };
 
-    // Tabela de Resultados
+    // Tabela de Resultados (renderiza com base nas 'stats' filtradas)
     const renderDailyResultsTable = (stats) => {
       const { tableData, totalRow } = stats;
       
@@ -592,7 +618,7 @@
       const renderRow = (row, isFooter = false) => {
         const gapColor = row.gap >= 0 ? 'text-green-400' : 'text-red-400';
         const fontWeight = isFooter ? 'font-bold' : 'font-medium';
-        const tag = isFooter ? 'td' : 'td'; // Em HTML, <tfoot> usa <td>
+        const tag = isFooter ? 'td' : 'td';
         
         return `
           <tr class="${isFooter ? 'bg-gray-900 border-t-2 border-gray-600' : 'border-b border-gray-700 hover:bg-gray-800'}">
@@ -610,10 +636,15 @@
         `;
       };
       
-      const tableBody = `<tbody>${tableData.map(row => renderRow(row, false)).join('')}</tbody>`;
-      const tableFooter = `<tfoot>${renderRow(totalRow, true)}</tfoot>`;
+      // Só mostra o corpo e rodapé se houver dados
+      let tableBody = `<tbody><tr><td colspan="7" class="text-center text-gray-500 py-4">Nenhum período selecionado.</td></tr></tbody>`;
+      let tableFooter = '';
       
-      // REMOVIDO: overflow-x-auto e min-w-[600px]
+      if (stats.tableData.length > 0) {
+        tableBody = `<tbody>${tableData.map(row => renderRow(row, false)).join('')}</tbody>`;
+        tableFooter = `<tfoot>${renderRow(totalRow, true)}</tfoot>`;
+      }
+      
       const tableContent = `
         <p class="text-sm text-gray-400 mb-4">Análise detalhada das métricas por dia</p>
         <div>
@@ -629,14 +660,27 @@
     };
     
     // --- 6. RENDERIZAÇÃO PRINCIPAL ---
-    // Esta função é chamada para desenhar e redesenhar a UI
     
     function renderApp() {
       // 1. Obter o elemento root
       const appEl = document.getElementById('app');
       
-      // 2. Calcular o estado derivado (antigo useMemo)
-      const stats = calculateStats(state.dailyData, state.satisfactionGoal);
+      // --- LÓGICA DE FILTRAGEM ---
+      let dataForDisplay = [];
+      if (state.selectedWeek) {
+        const start = new Date(state.selectedWeek.start + 'T00:00:00');
+        const end = new Date(state.selectedWeek.end + 'T00:00:00');
+        
+        // Filtra o armazém mestre 'state.dailyData'
+        dataForDisplay = state.dailyData.filter(item => {
+          const itemDate = new Date(item.date + 'T00:00:00');
+          return itemDate >= start && itemDate <= end;
+        }).sort((a, b) => new Date(a.date) - new Date(b.date)); // Garante a ordem
+      }
+      // Se nenhuma semana for selecionada, 'dataForDisplay' permanece como []
+      
+      // 2. Calcular estatísticas APENAS com os dados filtrados
+      const stats = calculateStats(dataForDisplay, state.satisfactionGoal);
       
       // 3. Gerar todo o HTML
       const appHTML = `
@@ -646,7 +690,7 @@
           <!-- Coluna da Esquerda: Configurações e Entradas -->
           <aside class="lg:col-span-1 flex flex-col gap-6">
             ${renderSettingsPanel(state)}
-            ${renderDailyDataInput(state)}
+            ${renderDailyDataInput(dataForDisplay, state.selectedWeek)}
           </aside>
 
           <!-- Coluna da Direita: Resultados e Gráficos -->
@@ -661,8 +705,7 @@
       // 4. Injetar o HTML no DOM
       appEl.innerHTML = appHTML;
       
-      // 5. Salvar o estado atualizado no localStorage
-      // A cada renderização (qualquer mudança), o estado é salvo.
+      // 5. Salvar o estado MESTRE (com todos os dados) no localStorage
       saveState(state);
     }
 
