@@ -66,9 +66,12 @@
       PlusCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-yellow-400"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
     };
     
-    // --- 2. ESTADO DA APLICAÇÃO ---
-    // Todo o estado que era gerido pelo React 'useState'
-    let state = {
+    // --- 2. GESTÃO DE ESTADO E PERSISTÊNCIA ---
+    
+    const STORAGE_KEY = 'csatDashboardState';
+    
+    // Estado Padrão
+    const defaultState = {
       satisfactionGoal: 85,
       selectedYear: 2025,
       selectedMonth: null,
@@ -76,6 +79,33 @@
       dailyData: [],
     };
     
+    // Tenta carregar do localStorage, senão usa o padrão
+    const loadState = () => {
+      try {
+        const serializedState = localStorage.getItem(STORAGE_KEY);
+        if (serializedState === null) {
+          return defaultState; // Primeira visita, usa o padrão
+        }
+        return JSON.parse(serializedState);
+      } catch (err) {
+        console.error("Erro ao carregar estado do localStorage:", err);
+        return defaultState; // Em caso de erro, usa o padrão
+      }
+    };
+    
+    // Salva o estado no localStorage
+    const saveState = (stateToSave) => {
+      try {
+        const serializedState = JSON.stringify(stateToSave);
+        localStorage.setItem(STORAGE_KEY, serializedState);
+      } catch (err) {
+        console.error("Erro ao salvar estado no localStorage:", err);
+      }
+    };
+    
+    // 'state' é inicializado com os dados salvos (ou padrão)
+    let state = loadState();
+
     // --- 3. CONSTANTES E HELPERS ---
     const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     const yearOptions = [2023, 2024, 2025, 2026, 2027];
@@ -630,6 +660,10 @@
       
       // 4. Injetar o HTML no DOM
       appEl.innerHTML = appHTML;
+      
+      // 5. Salvar o estado atualizado no localStorage
+      // A cada renderização (qualquer mudança), o estado é salvo.
+      saveState(state);
     }
 
     // --- 7. INICIALIZAÇÃO ---
